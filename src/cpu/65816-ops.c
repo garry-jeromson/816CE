@@ -2266,6 +2266,8 @@ void i_sbc(CPU_t *cpu, memory_t *mem, uint8_t size, uint8_t cycles, CPU_Addr_Mod
     {
         uint8_t val = _get_mem_byte(mem, addr, cpu->setacc);
         uint16_t al, alb;
+        uint8_t original_a = cpu->C & 0xff;  // Save original A for carry calculation
+        uint8_t original_c = cpu->P.C;       // Save original carry for carry calculation
 
         // Binary mode calculation
         alb = (cpu->C & 0xff) - val + cpu->P.C - 1;
@@ -2300,14 +2302,18 @@ void i_sbc(CPU_t *cpu, memory_t *mem, uint8_t size, uint8_t cycles, CPU_Addr_Mod
 
         // C and V are based on the binary result
         cpu->P.V = ((int16_t)alb < -128 || (int16_t)alb > 127) ? 1 : 0;
-        cpu->P.C = (alb >= 0x100) ? 1 : 0;
+        // For SBC, carry is set if no borrow occurred: A >= M + (1 - C_in)
+        // Using original values saved at start of function
+        cpu->P.C = ((uint16_t)original_a + original_c > val) ? 1 : 0;
 
     }
     else // 16-bit
     {
         uint16_t val;
         uint32_t al, alb;
-        
+        uint16_t original_a = cpu->C;  // Save original A for carry calculation
+        uint8_t original_c = cpu->P.C; // Save original carry for carry calculation
+
         if (mode == CPU_ADDR_DP || mode == CPU_ADDR_DPX ||
             mode == CPU_ADDR_IMMD || mode == CPU_ADDR_SR)
         {
@@ -2365,7 +2371,9 @@ void i_sbc(CPU_t *cpu, memory_t *mem, uint8_t size, uint8_t cycles, CPU_Addr_Mod
 
         // C and V are based on the binary result
         cpu->P.V = ((int32_t)alb < -32768 || (int32_t)alb > 32767) ? 1 : 0;
-        cpu->P.C = (alb >= 0x10000) ? 1 : 0;
+        // For SBC, carry is set if no borrow occurred: A >= M + (1 - C_in)
+        // Using original values saved at start of function
+        cpu->P.C = ((uint32_t)original_a + original_c > val) ? 1 : 0;
 
         cpu->cycles += 1;
         if (mode == CPU_ADDR_IMMD)
