@@ -34,7 +34,10 @@ void i_adc(CPU_t *cpu, memory_t *mem, uint8_t size, uint8_t cycles, CPU_Addr_Mod
         else // Binary mode
         {
             al = (cpu->C & 0xff) + val + cpu->P.C;
-            cpu->P.V = ((int16_t)al < -128 || (int16_t)al > 127) ? 1 : 0;
+            // V flag: check if signed result overflows 8-bit signed range
+            // Must sign-extend operands before computing to get correct signed result
+            int16_t signed_al = (int8_t)(cpu->C & 0xff) + (int8_t)val + cpu->P.C;
+            cpu->P.V = (signed_al < -128 || signed_al > 127) ? 1 : 0;
         }
 
         // 1f
@@ -93,7 +96,10 @@ void i_adc(CPU_t *cpu, memory_t *mem, uint8_t size, uint8_t cycles, CPU_Addr_Mod
         else
         {
             al = cpu->C + val + cpu->P.C;
-            cpu->P.V = ((int32_t)al < -32768 || (int32_t)al > 32767) ? 1 : 0;
+            // V flag: check if signed result overflows 16-bit signed range
+            // Must sign-extend operands before computing to get correct signed result
+            int32_t signed_al = (int16_t)cpu->C + (int16_t)val + cpu->P.C;
+            cpu->P.V = (signed_al < -32768 || signed_al > 32767) ? 1 : 0;
         }
         // 1f
         cpu->C = al & 0xffff;
@@ -2301,7 +2307,12 @@ void i_sbc(CPU_t *cpu, memory_t *mem, uint8_t size, uint8_t cycles, CPU_Addr_Mod
         cpu->P.Z = ((al & 0xff) == 0) ? 1 : 0;
 
         // C and V are based on the binary result
-        cpu->P.V = ((int16_t)alb < -128 || (int16_t)alb > 127) ? 1 : 0;
+        // V flag: check if signed result overflows 8-bit signed range
+        // Must sign-extend operands before computing to get correct signed result
+        {
+            int16_t signed_alb = (int8_t)original_a - (int8_t)val + original_c - 1;
+            cpu->P.V = (signed_alb < -128 || signed_alb > 127) ? 1 : 0;
+        }
         // For SBC, carry is set if no borrow occurred: A >= M + (1 - C_in)
         // Using original values saved at start of function
         cpu->P.C = ((uint16_t)original_a + original_c > val) ? 1 : 0;
@@ -2370,7 +2381,12 @@ void i_sbc(CPU_t *cpu, memory_t *mem, uint8_t size, uint8_t cycles, CPU_Addr_Mod
         cpu->P.Z = ((al & 0xffff) == 0) ? 1 : 0;
 
         // C and V are based on the binary result
-        cpu->P.V = ((int32_t)alb < -32768 || (int32_t)alb > 32767) ? 1 : 0;
+        // V flag: check if signed result overflows 16-bit signed range
+        // Must sign-extend operands before computing to get correct signed result
+        {
+            int32_t signed_alb = (int16_t)original_a - (int16_t)val + original_c - 1;
+            cpu->P.V = (signed_alb < -32768 || signed_alb > 32767) ? 1 : 0;
+        }
         // For SBC, carry is set if no borrow occurred: A >= M + (1 - C_in)
         // Using original values saved at start of function
         cpu->P.C = ((uint32_t)original_a + original_c > val) ? 1 : 0;
